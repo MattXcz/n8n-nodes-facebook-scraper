@@ -1,0 +1,139 @@
+{
+  "name": "Facebook Scraper – example (Reels + group post)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { resource: 'reel', url: 'https://www.facebook.com/reel/1397612515779779' } },\n  { json: { resource: 'post', url: 'https://www.facebook.com/groups/bambulabczsk/permalink/1819897855848074/' } },\n  { json: { resource: 'reel', url: 'https://www.facebook.com/not-a-reel' } }\n];"
+      },
+      "id": "a2",
+      "name": "Facebook URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "auto",
+        "resource": "detect",
+        "operation": "getInfoByUrl",
+        "url": "={{ $json.url }}",
+        "options": {
+          "delayBetweenItems": 3000
+        }
+      },
+      "id": "a3",
+      "name": "Facebook Scraper",
+      "type": "@mattxcz/n8n-nodes-facebook-scraper.facebookReels",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "facebookSessionApi": {
+          "id": "REPLACE",
+          "name": "Facebook Session (Cookies)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.videoUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a4",
+      "name": "Has Video?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        -100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a5",
+      "name": "Failed Reels",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        680,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Facebook URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook URLs": {
+      "main": [
+        [
+          {
+            "node": "Facebook Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Scraper": {
+      "main": [
+        [
+          {
+            "node": "Has Video?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failed Reels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
