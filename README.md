@@ -1,5 +1,7 @@
 # @mattxcz/n8n-nodes-facebook-scraper
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00?style=flat-square)](https://buymeacoffee.com/mattxcz)
+
 n8n community node: paste a Facebook **Reel** or **post** URL (including posts in groups), get metadata, images and direct video URLs as JSON.
 Self-hosted, no paid scraping services. Sibling of [n8n-nodes-instagram-scraper](https://github.com/MattXcz/n8n-nodes-instagram-scraper).
 
@@ -197,6 +199,16 @@ node dist/probe.js <url> --save      # saves raw HTML to .probe/ (contains sessi
 ## Tests
 
 `npm test` runs 91 tests over anonymized fixtures (`test/fixtures/generate.js` and `generate-posts.js` document which ones copy real responses and which are synthetic). They cover: direct + share link, Czech caption, missing stats (`null` vs `0`), invalid/expired session (3 variants), checkpoint/rate-limit/unavailable, recommended-Reel isolation, DASH vs progressive, cookie redaction, and several items with one failing in all 3 *On Error* modes.
+
+## Support
+
+Facebook changes its page structure without notice, so keeping this node working is ongoing maintenance rather than a one-off. If it saves you time, you can support that here: [buymeacoffee.com/mattxcz](https://buymeacoffee.com/mattxcz) ☕
+
+Bug reports and PRs are just as welcome — [open an issue](https://github.com/MattXcz/n8n-nodes-facebook-scraper/issues).
+
+## License
+
+MIT — see [LICENSE](./LICENSE). Copyright Matouš Bečvář.
 
 ## Disclaimer
 

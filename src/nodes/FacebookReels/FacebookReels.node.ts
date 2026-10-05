@@ -185,6 +185,13 @@ export class FacebookReels implements INodeType {
 				type: 'notice',
 				default: '',
 			},
+			{
+				displayName:
+					'Facebook keeps changing its page structure, so this node needs regular upkeep to keep working. If it saves you time, you can support that at <a href="https://buymeacoffee.com/mattxcz" target="_blank">buymeacoffee.com/mattxcz</a>.',
+				name: 'supportNotice',
+				type: 'notice',
+				default: '',
+			},
 		],
 	};
 
