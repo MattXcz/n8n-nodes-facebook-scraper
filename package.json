@@ -1,6 +1,6 @@
 {
   "name": "@mattxcz/n8n-nodes-facebook-scraper",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "n8n community node for extracting Facebook Reel and post (incl. group posts) metadata, images and direct video URLs, public-first with optional logged-in session",
   "license": "MIT",
   "publishConfig": {
