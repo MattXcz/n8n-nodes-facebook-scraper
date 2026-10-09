@@ -16,10 +16,12 @@ export type VideoDeliveryType = 'progressive' | 'dash' | null;
 
 /**
  * Normalized output of "Reel -> Get Info by URL".
- * The first block of fields mirrors the Instagram scraper's output names.
+ * Shared fields use exactly the same names, types and meaning as the
+ * Instagram scraper node (@mattxcz/n8n-nodes-instagram-scraper).
  * Unknown values are `null`; `0` only means Facebook actually reported zero.
  */
 export interface IReelSummary {
+	platform: 'facebook';
 	id: string;
 	url: string;
 	title: string | null;
@@ -33,8 +35,11 @@ export interface IReelSummary {
 	author: string | null;
 	authorFullName: string | null;
 	takenAt: string | null;
+	takenAtTimestamp: number | null;
 	mediaType: 'video' | 'unknown';
 	isVideo: boolean;
+	/** Always [] for Reels (the cover frame is in thumbnail); kept for the same shape as posts / Instagram. */
+	images: IPostImage[];
 
 	// Facebook-specific extras
 	inputUrl: string;
@@ -48,9 +53,13 @@ export interface IReelSummary {
 	height: number | null;
 	/** 'HD' | 'SD' for progressive files, or e.g. '1080p' for DASH video tracks. */
 	videoQuality: string | null;
-	/** 'progressive' = single MP4 with audio. 'dash' = video-only track, audio is separate (see audioUrl). */
+	/** 'progressive' = one standalone MP4 file. 'dash' = a single DASH track (video-only). */
 	videoDeliveryType: VideoDeliveryType;
+	/** Whether the file at videoUrl itself contains audio (read from the MP4 track list). null = unknown / no video. */
+	videoHasAudio: boolean | null;
+	/** true = videoUrl has no audio and the sound is in audioUrl -> merge them (ffmpeg). */
 	hasSeparateAudio: boolean | null;
+	/** Best audio-only track (DASH), whenever available - also when videoUrl already has audio. */
 	audioUrl: string | null;
 	videoUrlHd: string | null;
 	videoUrlSd: string | null;
@@ -73,10 +82,11 @@ export interface IPostImage {
 	alt: string | null;
 }
 
-export type PostMediaType = 'text' | 'photo' | 'album' | 'video' | 'link' | 'unknown';
+export type PostMediaType = 'text' | 'photo' | 'carousel' | 'video' | 'link' | 'unknown';
 
 /** Normalized output of "Post -> Get Info by URL" (same core names as Reels / Instagram). */
 export interface IPostSummary {
+	platform: 'facebook';
 	id: string;
 	url: string;
 	title: string | null;
@@ -90,6 +100,7 @@ export interface IPostSummary {
 	author: string | null;
 	authorFullName: string | null;
 	takenAt: string | null;
+	takenAtTimestamp: number | null;
 	mediaType: PostMediaType;
 	isVideo: boolean;
 
@@ -98,6 +109,15 @@ export interface IPostSummary {
 	images: IPostImage[];
 	authorId: string | null;
 	authorUrl: string | null;
+	authorIsVerified: boolean | null;
+	durationSeconds: number | null;
+	width: number | null;
+	height: number | null;
+	videoQuality: string | null;
+	videoDeliveryType: VideoDeliveryType;
+	videoHasAudio: boolean | null;
+	hasSeparateAudio: boolean | null;
+	audioUrl: string | null;
 	groupId: string | null;
 	groupName: string | null;
 	groupUrl: string | null;

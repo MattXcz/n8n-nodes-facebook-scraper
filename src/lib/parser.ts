@@ -444,6 +444,7 @@ export function parseReelPage(html: string, opts: ParseOptions): IReelSummary {
 	const authorUrl = (owner?.url as string | undefined) ?? null;
 
 	return {
+		platform: 'facebook',
 		id: reelId,
 		url: canonicalReelUrl(reelId),
 		title: titleFromCaption(caption),
@@ -457,8 +458,10 @@ export function parseReelPage(html: string, opts: ParseOptions): IReelSummary {
 		author: usernameFromProfileUrl(authorUrl) ?? (owner?.id ? String(owner.id) : null),
 		authorFullName,
 		takenAt: unixToIso(creation),
+		takenAtTimestamp: creation,
 		mediaType: hasRelay || ogBelongs ? 'video' : 'unknown',
 		isVideo: hasRelay || ogBelongs,
+		images: [],
 
 		inputUrl: opts.inputUrl,
 		postId,
@@ -471,6 +474,8 @@ export function parseReelPage(html: string, opts: ParseOptions): IReelSummary {
 		height,
 		videoQuality: video.quality,
 		videoDeliveryType: video.type,
+		// DASH video tracks never carry audio; progressive files are verified by the client (MP4 probe).
+		videoHasAudio: video.type === 'dash' ? false : null,
 		hasSeparateAudio: video.hasSeparateAudio,
 		audioUrl: video.audioUrl,
 		videoUrlHd: video.hd,

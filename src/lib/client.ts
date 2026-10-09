@@ -4,7 +4,7 @@ import { FacebookSession, redactSecrets } from './session';
 import { detectPageSignals, parseReelPage } from './parser';
 import { parsePostPage } from './postParser';
 import { IFacebookCredentials, IFetchResult, IPostSummary, IReelSummary } from './types';
-import { canonicalReelUrl, delay, errorMessage, parsePostUrl, parseReelUrl, postIdFromUrl, reelIdFromUrl } from './utils';
+import { canonicalReelUrl, delay, errorMessage, mp4HasAudio, parsePostUrl, parseReelUrl, postIdFromUrl, reelIdFromUrl } from './utils';
 
 export interface ClientOptions {
 	/** When true, cookies are never sent even if present in the credential. */
@@ -169,12 +169,13 @@ export class FacebookClient {
 			}
 			this.throwForPage(page, id);
 			try {
-				return parseReelPage(page.html, {
+				const r = parseReelPage(page.html, {
 					reelId: id,
 					inputUrl,
 					authenticated: this.authenticated,
 					videoPreference: this.opts.videoPreference,
 				});
+				return await this.withAudioCheck(r);
 			} catch (e) {
 				if (isFacebookError(e, 'PAGE_STRUCTURE_CHANGED') && !this.authenticated) {
 					throw new FacebookScraperError('LOGIN_REQUIRED', `${e.message} Anonymous access returned no Reel data; add session cookies.`);
@@ -211,12 +212,13 @@ export class FacebookClient {
 			const page = prefetched ?? (await this.fetchPage(url));
 			this.throwForPage(page, null);
 			try {
-				return parsePostPage(page.html, {
+				const r = parsePostPage(page.html, {
 					postId,
 					inputUrl,
 					authenticated: this.authenticated,
 					videoPreference: this.opts.videoPreference,
 				});
+				return await this.withAudioCheck(r);
 			} catch (e) {
 				if (isFacebookError(e, 'PAGE_STRUCTURE_CHANGED') && !this.authenticated) {
 					throw new FacebookScraperError('LOGIN_REQUIRED', `${e.message} Anonymous access returned no post data.`);
@@ -224,6 +226,39 @@ export class FacebookClient {
 				throw e;
 			}
 		});
+	}
+
+	/**
+	 * Verifies whether the file at videoUrl really contains audio by reading
+	 * its MP4 track list (HTTP Range, usually one ~512 kB request), and sets
+	 * videoHasAudio / hasSeparateAudio accordingly. DASH tracks are already
+	 * known to be video-only. Never throws: on failure videoHasAudio stays null
+	 * and the parser's hasSeparateAudio is kept.
+	 */
+	private async withAudioCheck<T extends IReelSummary | IPostSummary>(r: T): Promise<T> {
+		if (!r.videoUrl) return { ...r, videoHasAudio: null, hasSeparateAudio: null };
+		let has = r.videoHasAudio;
+		if (has === null) {
+			const url = r.videoUrl;
+			try {
+				has = await mp4HasAudio(async (start, end) => {
+					const res = await this.opts.fetchImpl(url, {
+						method: 'GET',
+						headers: { range: `bytes=${start}-${end}`, 'user-agent': this.creds.userAgent?.trim() || DEFAULT_UA },
+						dispatcher: this.dispatcher,
+						signal: AbortSignal.timeout(this.opts.timeoutMs),
+					} as any);
+					if (!res.ok) throw new Error(`HTTP ${res.status}`);
+					const data = Buffer.from(await res.arrayBuffer());
+					// 200 instead of 206 = server ignored Range and sent the whole file.
+					return res.status === 206 ? data : data.subarray(start, end + 1);
+				});
+			} catch {
+				has = null;
+			}
+		}
+		if (has === null) return { ...r, videoHasAudio: null };
+		return { ...r, videoHasAudio: has, hasSeparateAudio: !has && !!r.audioUrl };
 	}
 
 	/** Lightweight check used by the credential test: is this a logged-in session? */

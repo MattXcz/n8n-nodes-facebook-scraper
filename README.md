@@ -34,13 +34,55 @@ npm publish                # prepublishOnly runs build + tests
 
 Every result also contains `resource` and the [access fields](#authentication-modes) `authUsed`, `credentialsRequired` and `publicAttempt`.
 
+### Common output (identical in the Instagram and Facebook scraper)
+
+Both nodes (`@mattxcz/n8n-nodes-instagram-scraper`, `@mattxcz/n8n-nodes-facebook-scraper`) return the same core fields with the same names, types and meaning, so one downstream workflow can handle both. Unknown values are `null`; `0` means the platform really reported zero. Dates are ISO 8601.
+
+| Field | Notes |
+|---|---|
+| `platform` | `"instagram"` / `"facebook"` |
+| `id`, `url`, `inputUrl` | Platform id, canonical URL, URL as passed in |
+| `title` | First non-empty line of the caption (max 120 chars), or `null` |
+| `description` | Full caption / post text |
+| `thumbnail` | Cover image (signed CDN URL, expires) |
+| `images[]` | Photos only, `{ id, url, width, height, alt }`, full resolution. A video's cover frame is in `thumbnail`. |
+| `mediaType`, `isVideo` | `photo` \| `carousel` \| `video` \| `unknown` (Facebook posts also `text` \| `link`) |
+| `videoUrl` | Direct video file, or `null` |
+| `videoQuality` | e.g. `720p` (Facebook progressive: `HD` / `SD`) |
+| `videoDeliveryType` | `progressive` = one standalone MP4, `dash` = single DASH video track |
+| `videoHasAudio` | Whether the file at `videoUrl` itself contains audio – verified by reading the MP4 track list (HTTP Range, usually one ~512 kB request). `null` = no video / check failed |
+| `hasSeparateAudio` | `true` = `videoUrl` has **no** audio and the sound is in `audioUrl` → merge them |
+| `audioUrl` | Best audio-only track (DASH) whenever available – also when `videoUrl` already has audio (handy for transcription) |
+| `videoUrlExpiresAt` | Expiry of the signed CDN URL (from the `oe` parameter) |
+| `durationSeconds`, `width`, `height` | Video duration and dimensions |
+| `likeCount`, `commentCount`, `viewCount`, `shareCount` | `likeCount` = likes (Instagram) / all reactions (Facebook) |
+| `topComment` | `{ text, author, likeCount }` or `null` |
+| `author`, `authorFullName`, `authorId`, `authorUrl`, `authorIsVerified` | `author` = username / vanity name |
+| `takenAt`, `takenAtTimestamp` | Publish time (ISO 8601 / unix seconds) |
+| `authenticated`, `fetchedAt` | Whether a logged-in session was used; time of the lookup |
+
+Error items (with *On Error → Continue*) have the same shape in both nodes: `{ error, errorCode, url }`, where `errorCode` is one of `INVALID_URL`, `CONTENT_UNAVAILABLE`, `SESSION_EXPIRED`, `LOGIN_REQUIRED`, `VERIFICATION_REQUIRED`, `RATE_LIMITED`, `PAGE_STRUCTURE_CHANGED`, `NETWORK_ERROR`, `HTTP_ERROR` or `null`.
+
+**Getting a video with sound in every case:** if `hasSeparateAudio` is `true`, merge the two files:
+
+```bash
+ffmpeg -i video.mp4 -i audio.mp4 -map 0:v -map 1:a -c copy out.mp4
+```
+
+## 2.0.0 – breaking changes
+
+Output unified with `@mattxcz/n8n-nodes-instagram-scraper`:
+- `mediaType` `album` → `carousel`.
+- `hasSeparateAudio` is now verified: `true` only when `videoUrl` really has no audio (new `videoHasAudio`, read from the MP4) and `audioUrl` exists.
+- New fields: `platform`, `takenAtTimestamp`, `videoHasAudio`; Reels also `images` (always `[]`); posts also `authorIsVerified`, `durationSeconds`, `width`, `height`, `videoQuality`, `videoDeliveryType`, `hasSeparateAudio`, `audioUrl`.
+
 ## Post → Get Info by URL
 
 Same core field names as Reels: `id` (numeric post_id), `url`, `title`, `description` (full text with diacritics, emoji and line breaks), `thumbnail`, `videoUrl`, `likeCount` (all reactions), `commentCount`, `viewCount`, `topComment`, `author`, `authorFullName`, `takenAt`, `mediaType`, `isVideo`.
 
-Extras: `images[]` (`{id, url, width, height, alt}`, full resolution), `shareCount`, `groupId`, `groupName`, `groupUrl`, `authorId`, `authorUrl`, `linkUrl`, `linkTitle` (for shared links, `l.facebook.com` unwrapped), `descriptionTruncated`, `videoUrlExpiresAt`.
+Facebook-specific extras: `groupId`, `groupName`, `groupUrl`, `authorId`, `authorUrl`, `linkUrl`, `linkTitle` (for shared links, `l.facebook.com` unwrapped), `descriptionTruncated`, `statsSource`, `dataSource`.
 
-`mediaType`: `text` | `photo` | `album` | `video` | `link` | `unknown`.
+`mediaType`: `text` | `photo` | `carousel` | `video` | `link` | `unknown`.
 
 Notes:
 - Group members usually have a privacy id (`pfbid…`) and no public profile URL, so `author` is `null` and `authorFullName` carries the name.
@@ -74,7 +116,7 @@ Field names follow the Instagram node where possible. Missing values are `null`;
 | `takenAt` | Publish time, ISO 8601 |
 | `mediaType`, `isVideo` | `"video"`, `true` |
 
-Extras: `inputUrl, postId, shareCount, authorId, authorUrl, authorIsVerified, durationSeconds, width, height, videoQuality, videoDeliveryType, hasSeparateAudio, audioUrl, videoUrlHd, videoUrlSd, dashManifestUrl, videoUrlExpiresAt, statsSource, dataSource, authenticated, fetchedAt`.
+Facebook-specific extras: `postId, videoUrlHd, videoUrlSd, dashManifestUrl, statsSource, dataSource`.
 
 ### Video
 
@@ -82,7 +124,7 @@ Facebook serves two kinds of files:
 
 | `videoDeliveryType` | What it is | `hasSeparateAudio` |
 |---|---|---|
-| `progressive` | Single MP4 with audio (HD ≈ 720p, SD ≈ 360p). Download and play as-is. | `false` |
+| `progressive` | Single MP4, normally with audio (HD ≈ 720p, SD ≈ 360p). Verified via `videoHasAudio`. | `false` (or `true` if the file turns out to have no audio and `audioUrl` exists) |
 | `dash` | Video-only track, usually up to 1080p. Audio is in `audioUrl` and must be muxed, e.g. `ffmpeg -i v.mp4 -i a.mp4 -c copy out.mp4` | `true` |
 
 Option **Video Preference**: *Single MP4 With Audio* (default) or *Highest Resolution (may be video-only)*.

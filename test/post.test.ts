@@ -100,9 +100,9 @@ describe('anonymous group post (real og format)', () => {
 });
 
 describe('SYNTHETIC post types', () => {
-	it('album: all photos in full resolution', () => {
+	it('carousel: all photos in full resolution', () => {
 		const r = parsePostPage(fx('post-album.html'), { ...base, postId: '1820000000000001' });
-		expect(r.mediaType).toBe('album');
+		expect(r.mediaType).toBe('carousel');
 		expect(r.images.map((i) => i.id)).toEqual(['901', '902', '903']);
 		expect(r.images[0].url).toContain('FULL_901');
 		expect(r.images[0].width).toBe(2048);

@@ -238,7 +238,7 @@ export function parsePostPage(html: string, opts: PostParseOptions): IPostSummar
 	const images_ = [...images.values()];
 	let mediaType: PostMediaType = 'unknown';
 	if (videos.length) mediaType = 'video';
-	else if (images_.length > 1) mediaType = 'album';
+	else if (images_.length > 1) mediaType = 'carousel';
 	else if (images_.length === 1) mediaType = 'photo';
 	else if (linkUrl) mediaType = 'link';
 	else if (hasRelay && (textOnly || stories.every((s) => !Array.isArray(s.attachments) || s.attachments.length === 0))) mediaType = 'text';
@@ -249,7 +249,9 @@ export function parsePostPage(html: string, opts: PostParseOptions): IPostSummar
 	const groupUrl: string | null = group?.url ?? (opts.inputUrl.match(/https?:\/\/[^/]+\/groups\/[^/]+\//)?.[0] ?? null);
 	const usedOg = ogBelongs && (!hasRelay || (!images_.length && !videoThumb && !!thumbnail));
 
+	const v0 = videos[0] ?? null;
 	return {
+		platform: 'facebook',
 		id: target ?? opts.postId,
 		url: permalink ?? (ogBelongs && ogUrl ? decodeHtmlEntities(ogUrl) : opts.inputUrl),
 		title: seoTitle ?? ogTitleText ?? titleFromCaption(text),
@@ -263,6 +265,7 @@ export function parsePostPage(html: string, opts: PostParseOptions): IPostSummar
 		author: usernameFromProfileUrl(authorUrl),
 		authorFullName: actor?.name ?? null,
 		takenAt: unixToIso(created),
+		takenAtTimestamp: created,
 		mediaType,
 		isVideo: mediaType === 'video',
 
@@ -271,6 +274,16 @@ export function parsePostPage(html: string, opts: PostParseOptions): IPostSummar
 		images: images_,
 		authorId: actor?.id ? String(actor.id) : null,
 		authorUrl,
+		authorIsVerified: typeof actor?.is_verified === 'boolean' ? actor.is_verified : null,
+		durationSeconds:
+			num(v0?.length_in_second) ?? (num(v0?.playable_duration_in_ms) !== null ? (num(v0?.playable_duration_in_ms) as number) / 1000 : null),
+		width: num(v0?.width),
+		height: num(v0?.height),
+		videoQuality: video.quality,
+		videoDeliveryType: video.type,
+		videoHasAudio: video.type === 'dash' ? false : null,
+		hasSeparateAudio: video.hasSeparateAudio,
+		audioUrl: video.audioUrl,
 		groupId: group?.id ? String(group.id) : null,
 		groupName: group?.name ?? ogGroupName,
 		groupUrl,

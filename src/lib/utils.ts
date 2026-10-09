@@ -215,3 +215,51 @@ export function errorMessage(e: unknown): string {
 	if (e instanceof Error) return e.message;
 	return typeof e === 'string' ? e : 'Unknown error';
 }
+
+/**
+ * Determines whether an MP4 file contains an audio track by walking its
+ * top-level boxes to `moov` and looking for a `hdlr` box with handler type
+ * `soun`. Only the needed byte ranges are fetched via `readRange` (inclusive
+ * start/end) - usually just the first chunk. Returns null if the structure
+ * couldn't be read. Same implementation as in the Instagram scraper.
+ */
+export async function mp4HasAudio(
+	readRange: (start: number, end: number) => Promise<Buffer>,
+	chunkSize = 512 * 1024,
+	maxMoovSize = 16 * 1024 * 1024,
+): Promise<boolean | null> {
+	let bufStart = 0;
+	let buf = await readRange(0, chunkSize - 1);
+	const ensure = async (start: number, length: number): Promise<boolean> => {
+		if (start >= bufStart && start + length <= bufStart + buf.length) return true;
+		buf = await readRange(start, start + Math.max(length, chunkSize) - 1);
+		bufStart = start;
+		return length <= buf.length;
+	};
+	let offset = 0;
+	for (let i = 0; i < 20; i++) {
+		if (!(await ensure(offset, 16)) && !(await ensure(offset, 8))) return null;
+		const rel = offset - bufStart;
+		let size = buf.readUInt32BE(rel);
+		const type = buf.toString('latin1', rel + 4, rel + 8);
+		if (size === 1) {
+			if (rel + 16 > buf.length) return null;
+			size = Number(buf.readBigUInt64BE(rel + 8));
+		}
+		if (type === 'moov') {
+			if (size === 0 || size > maxMoovSize) return null;
+			if (!(await ensure(offset, size))) return null;
+			const moov = buf.subarray(offset - bufStart, offset - bufStart + size);
+			let idx = moov.indexOf('hdlr', 0, 'latin1');
+			while (idx !== -1) {
+				// hdlr: [type 4][version+flags 4][pre_defined 4][handler_type 4]
+				if (moov.toString('latin1', idx + 12, idx + 16) === 'soun') return true;
+				idx = moov.indexOf('hdlr', idx + 4, 'latin1');
+			}
+			return false;
+		}
+		if (size < 8) return null;
+		offset += size;
+	}
+	return null;
+}
